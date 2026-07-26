@@ -6,9 +6,10 @@ class Config:
     """Engine configuration."""
 
     model: str
-    max_num_seqs: int = 64          # scheduler batch ceiling (M2)
-    kv_block_size: int = 256        # tokens per KV block (M2)
-    max_model_len: int = 8192       # hard cap on prompt+output length
+    max_num_seqs: int = 64             # max sequences decoded concurrently
+    block_size: int = 16               # tokens per KV block
+    kv_cache_memory_gb: float = 4.0    # budget for the paged KV pools
+    max_model_len: int = 8192          # hard cap on prompt+output length
 
     @classmethod
     def from_kwargs(cls, model: str, **kwargs) -> "Config":

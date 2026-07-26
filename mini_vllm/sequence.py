@@ -12,7 +12,14 @@ class SequenceStatus(Enum):
 
 class Sequence:
     """State for a single generation request: its tokens, sampling params, and
-    lifecycle status."""
+    lifecycle status.
+
+    Paging state:
+      * ``block_table`` — physical KV block ids assigned to this sequence.
+      * ``num_cached``  — how many tokens already have their KV written to the
+        pool. The next token to process is ``token_ids[num_cached]`` at position
+        ``num_cached``.
+    """
 
     _counter = itertools.count()
 
@@ -23,6 +30,8 @@ class Sequence:
         self.output_ids: list[int] = []           # generated only
         self.sampling_params = sampling_params
         self.status = SequenceStatus.WAITING
+        self.block_table: list[int] = []
+        self.num_cached = 0
 
     def __len__(self) -> int:
         return len(self.token_ids)
@@ -30,6 +39,10 @@ class Sequence:
     @property
     def num_prompt_tokens(self) -> int:
         return len(self.prompt_token_ids)
+
+    @property
+    def num_output_tokens(self) -> int:
+        return len(self.output_ids)
 
     @property
     def last_token(self) -> int:

@@ -48,12 +48,14 @@ python example.py
 
 ## Benchmarks
 
-Preliminary, raw MLX on an Apple **M4** with `Qwen3-0.6B-4bit`:
+Apple **M4** (base), `Qwen3-0.6B-4bit`:
 
-- Single-stream decode: **~99 tok/s**.
-- Naive batched decode loop (no engine yet): aggregate throughput scales **~78 → ~750 tok/s** from batch 1 → 128.
+| mode | throughput |
+| --- | --- |
+| single-stream decode | ~99 tok/s |
+| continuous batching (256 reqs, 64 concurrent) | ~310 tok/s aggregate decode |
 
-The engine will realize this batched throughput via continuous batching (M2). Numbers scale up substantially on M-series Pro/Max.
+Continuous batching gives ~3× over single-stream on a base M4. The paged-attention decode path still has headroom — gather materialization and per-step host work — later targets via `mx.async_eval` pipelining and `mx.compile`. Numbers scale up substantially on M-series Pro/Max.
 
 ## Credits
 
