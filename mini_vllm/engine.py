@@ -17,8 +17,18 @@ class LLMEngine:
         self.config = Config.from_kwargs(model, **kwargs)
         self.model_runner = ModelRunner(self.config)
         self.tokenizer = self.model_runner.tokenizer
-        self.block_manager = BlockManager(self.model_runner.num_blocks, self.config.block_size)
+        self.block_manager = BlockManager(
+            self.model_runner.num_blocks, self.config.block_size,
+            self.config.enable_prefix_cache,
+        )
         self.scheduler = Scheduler(self.config, self.block_manager)
+
+    def _register_blocks(self, seq: Sequence) -> None:
+        """Add this sequence's freshly prefilled full prompt blocks to the cache."""
+        bs = self.config.block_size
+        for i in range(seq.prefill_start // bs, seq.num_prompt_tokens // bs):
+            toks = tuple(seq.prompt_token_ids[i * bs:(i + 1) * bs])
+            self.block_manager.register(seq.block_table[i], seq.block_hashes[i], toks)
 
     def _sample(self, logits: mx.array, seqs: list[Sequence]) -> list[int]:
         if all(s.sampling_params.temperature == 0.0 for s in seqs):
@@ -53,6 +63,7 @@ class LLMEngine:
                 if seq is None:
                     break
                 logits = self.model_runner.prefill(seq)        # (1, V)
+                self._register_blocks(seq)                     # cache new full prompt blocks
                 token = self._sample(logits, [seq])[0]
                 seq.num_cached = len(seq.token_ids)            # prompt now cached
                 self._accept(seq, token)

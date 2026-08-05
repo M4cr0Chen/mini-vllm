@@ -53,9 +53,10 @@ Apple **M4** (base), `Qwen3-0.6B-4bit`:
 | mode | throughput |
 | --- | --- |
 | single-stream decode | ~99 tok/s |
-| continuous batching (256 reqs, 64 concurrent) | ~310 tok/s aggregate decode |
+| continuous batching (256 reqs, 64 concurrent) | ~536 tok/s aggregate decode |
+| + prefix caching (128 reqs sharing a ~240-tok prefix) | 4.4× faster end-to-end |
 
-Continuous batching gives ~3× over single-stream on a base M4. The paged-attention decode path still has headroom — gather materialization and per-step host work — later targets via `mx.async_eval` pipelining and `mx.compile`. Numbers scale up substantially on M-series Pro/Max.
+Continuous batching gives ~5× over single-stream on a base M4. Decode is near the compute roofline for this model: an incremental decode buffer replaced per-step KV re-gathering for a 1.77× gain, while `mx.compile` and `mx.async_eval` measured at ~1.0× and ~1.1× (the forward is dominated by 4-bit `quantized_matmul`, which doesn't fuse). Prefix caching reuses KV blocks for shared prompt prefixes — a big win for system prompts, few-shot, and agents. Numbers scale up substantially on M-series Pro/Max.
 
 ## Credits
 

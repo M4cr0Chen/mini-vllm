@@ -32,6 +32,8 @@ class Sequence:
         self.status = SequenceStatus.WAITING
         self.block_table: list[int] = []
         self.num_cached = 0
+        self.block_hashes: list[int] = []         # chained hash per full prompt block
+        self.prefill_start = 0                    # tokens reused from the prefix cache
 
     def __len__(self) -> int:
         return len(self.token_ids)

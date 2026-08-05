@@ -54,14 +54,30 @@ class ModelRunner:
         return bt[positions // self.block_size] * self.block_size + positions % self.block_size
 
     def prefill(self, seq) -> mx.array:
-        """Process the full prompt for one sequence. Returns last logits (1, V)."""
+        """Prefill a sequence's uncached suffix. With a reused prefix it attends
+        to the cached prefix (gathered from the pool) plus itself. Returns (1, V)."""
         ids = seq.token_ids
-        slots = self._slots(seq.block_table, np.arange(len(ids)))
-        self.cache.set_meta(BatchMeta(
-            is_prefill=True, rope_offset=0,
-            pool_slots=mx.array(slots.astype(np.int32)), mask="causal",
-        ))
-        x = mx.array([ids])                                   # (1, L)
+        L = len(ids)
+        start = seq.prefill_start                              # tokens reused from the cache
+        suffix_slots = self._slots(seq.block_table, np.arange(start, L))
+        if start > 0:
+            prefix_slots = self._slots(seq.block_table, np.arange(start))
+            qpos = np.arange(start, L)[:, None]               # suffix query positions
+            kpos = np.arange(L)[None, :]                      # all key positions
+            mask = np.where(kpos <= qpos, 0.0, -1e9).reshape(1, 1, L - start, L)
+            meta = BatchMeta(
+                is_prefill=True, rope_offset=start,
+                pool_slots=mx.array(suffix_slots.astype(np.int32)),
+                prefix_slots=mx.array(prefix_slots.astype(np.int32)),
+                mask=mx.array(mask).astype(self.dtype),
+            )
+        else:
+            meta = BatchMeta(
+                is_prefill=True, rope_offset=0,
+                pool_slots=mx.array(suffix_slots.astype(np.int32)), mask="causal",
+            )
+        self.cache.set_meta(meta)
+        x = mx.array([ids[start:]])                           # (1, L-start) suffix tokens
         logits = self.model(x, cache=self.cache.layers)[:, -1, :]
         self._last_ids = ()                                   # running set changed -> rebuild
         return logits

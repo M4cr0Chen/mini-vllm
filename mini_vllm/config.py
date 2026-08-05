@@ -10,6 +10,7 @@ class Config:
     block_size: int = 16               # tokens per KV block
     kv_cache_memory_gb: float = 4.0    # budget for the paged KV pools
     max_model_len: int = 8192          # hard cap on prompt+output length
+    enable_prefix_cache: bool = True   # reuse KV blocks for shared prompt prefixes
 
     @classmethod
     def from_kwargs(cls, model: str, **kwargs) -> "Config":
